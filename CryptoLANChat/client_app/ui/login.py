@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 HOST = "127.0.0.1"   # Server IP
 PORT = 5000          # Server port
 
+
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -58,25 +59,29 @@ class LoginWindow(QWidget):
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((HOST, PORT))
 
-            # Server’dan gelen ilk mesajları oku
-            welcome1 = client_socket.recv(1024).decode("utf-8")
-            welcome2 = client_socket.recv(1024).decode("utf-8")
-            print(welcome1.strip(), welcome2.strip())
-
             # Giriş veya kayıt isteğini gönder
             login_data = f"{mode} {username}:{password}"
             client_socket.sendall(login_data.encode("utf-8"))
 
-            response = client_socket.recv(1024).decode("utf-8")
-            if "Hoş geldiniz" in response or "Kayıt başarılı" in response:
-                self.chat = ChatWindow(username, client_socket)
-                self.chat.show()
-                self.close()
-            else:
-                QMessageBox.warning(self, "Hata", response.strip())
-                client_socket.close()
+            # Cevabı ayrı thread’te dinle
+            def listen_for_response():
+                try:
+                    response = client_socket.recv(1024).decode("utf-8")
+                    if "Hoş geldiniz" in response or "Kayıt başarılı" in response:
+                        self.chat = ChatWindow(username, client_socket)
+                        self.chat.show()
+                        self.close()
+                    else:
+                        QMessageBox.warning(self, "Hata", response.strip())
+                        client_socket.close()
+                except Exception as e:
+                    QMessageBox.critical(self, "Bağlantı Hatası", str(e))
+
+            threading.Thread(target=listen_for_response, daemon=True).start()
+
         except Exception as e:
             QMessageBox.critical(self, "Bağlantı Hatası", str(e))
+
 
 class ChatWindow(QWidget):
     def __init__(self, username, client_socket):
@@ -119,6 +124,7 @@ class ChatWindow(QWidget):
                     self.chat_box.append(data.decode("utf-8"))
             except:
                 break
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
