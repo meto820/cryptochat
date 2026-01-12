@@ -2,12 +2,13 @@ import socket
 import threading
 import json
 
-HOST = "0.0.0.0"
+HOST = "0.0.0.0"   # Tüm IP’lerden bağlantı kabul et
 PORT = 5000
 
 clients = []
 lock = threading.Lock()
 
+# Kullanıcı verilerini yükle
 def load_users():
     try:
         with open("users.json", "r", encoding="utf-8") as f:
@@ -15,6 +16,7 @@ def load_users():
     except FileNotFoundError:
         return {}
 
+# Kullanıcı verilerini kaydet
 def save_users(users):
     with open("users.json", "w", encoding="utf-8") as f:
         json.dump(users, f, indent=4)
@@ -37,9 +39,14 @@ def handle_client(conn, addr):
 
     try:
         data = conn.recv(1024).decode("utf-8").strip()
+        if not data:
+            conn.close()
+            return
+
         if data.startswith("LOGIN"):
             _, creds = data.split(" ", 1)
             username, password = creds.split(":", 1)
+
             if username in users and users[username] == password:
                 conn.sendall(f"[server] Hoş geldiniz {username}!\n".encode("utf-8"))
                 with lock:
@@ -61,8 +68,10 @@ def handle_client(conn, addr):
         elif data.startswith("REGISTER"):
             _, creds = data.split(" ", 1)
             username, password = creds.split(":", 1)
+
             if username in users:
                 conn.sendall("[server] Bu kullanıcı zaten kayıtlı!\n".encode("utf-8"))
+                conn.close()
             else:
                 users[username] = password
                 save_users(users)
